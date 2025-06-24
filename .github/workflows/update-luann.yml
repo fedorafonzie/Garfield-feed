@@ -1,4 +1,4 @@
-name: Generate and Deploy Garfield Feed
+name: Generate and Deploy Luann Feed
 
 on:
   schedule:
