@@ -47,7 +47,7 @@ current_date_str = current_date.strftime("%Y-%m-%d")
 
 fe = fg.add_entry()
 fe.id(image_url)
-fe.title('Garfield - {current_date_str}')
+fe.title(f'Garfield - {current_date_str}')
 fe.link(href=GARFIELD_URL)
 fe.pubDate(current_date)
 fe.description(f'<img src="{image_url}" alt="Garfield Strip voor {current_date_str}" />')
