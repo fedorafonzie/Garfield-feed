@@ -21,7 +21,6 @@ except requests.exceptions.RequestException as e:
 # Stap 2: Zoek met een regular expression naar de afbeeldings-URL
 print("Zoeken naar de afbeeldings-URL met een regular expression...")
 
-# --- CORRECTIE gebaseerd op uw voorstel ---
 # Het patroon zoekt naar de volledige URL die begint met de basis
 # en gevolgd wordt door een reeks van hexadecimale karakters (a-f, 0-9).
 match = re.search(r'(https://featureassets.gocomics.com/assets/[a-f0-9]+)', response.text)
@@ -38,7 +37,7 @@ print(f"SUCCES: Afbeelding URL gevonden via Regular Expression: {image_url}")
 # Stap 3: Bouw de RSS-feed
 fg = FeedGenerator()
 fg.id(GARFIELD_URL)
-fg.title('Garfield Comic Strip')
+fg.title('Garfield  Comic Strip')
 fg.link(href=GARFIELD_URL, rel='alternate')
 fg.description('De dagelijkse Garfield strip.')
 fg.language('en')
@@ -48,7 +47,7 @@ current_date_str = current_date.strftime("%Y-%m-%d")
 
 fe = fg.add_entry()
 fe.id(image_url)
-fe.title(f'Garfield- {current_date_str}')
+fe.title('Garfield - {current_date_str}')
 fe.link(href=GARFIELD_URL)
 fe.pubDate(current_date)
 fe.description(f'<img src="{image_url}" alt="Garfield Strip voor {current_date_str}" />')
