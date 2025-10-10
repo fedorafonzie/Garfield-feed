@@ -1,59 +1,48 @@
-import requests
-import re
 from feedgen.feed import FeedGenerator
 from datetime import datetime, timezone
 
-print("Script gestart: Ophalen van de dagelijkse Garfield strip via Regular Expression.")
+print("Script gestart: Genereren van de Garfield RSS-feed op basis van datum.")
 
-# URL van de Garfield comic pagina
-GARFIELD_URL = 'https://www.gocomics.com/garfield'
+# --- Stap 1: Genereer de URL voor de strip van vandaag ---
 
-# Stap 1: Haal de webpagina op
-try:
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-    response = requests.get(GARFIELD_URL, headers=headers)
-    response.raise_for_status()
-    print("SUCCES: GoComics pagina HTML opgehaald.")
-except requests.exceptions.RequestException as e:
-    print(f"FOUT: Kon GoComics pagina niet ophalen. Fout: {e}")
-    exit(1)
+# Haal de huidige datum op
+nu = datetime.now(timezone.utc)
 
-# Stap 2: Zoek met een regular expression naar de afbeeldings-URL
-print("Zoeken naar de afbeeldings-URL met een regular expression...")
+# Formatteer de datum naar de structuur die de URL vereist (YYMMDD)
+# Voorbeeld: 10 oktober 2025 wordt '251010'
+datum_code = nu.strftime('%y%m%d')
+jaar = nu.strftime('%Y')
 
-# Het patroon zoekt naar de volledige URL die begint met de basis
-# en gevolgd wordt door een reeks van hexadecimale karakters (a-f, 0-9).
-match = re.search(r'(https://featureassets.gocomics.com/assets/[a-f0-9]+)', response.text)
+# Bouw de volledige URL op
+# Voorbeeld: http://picayune.uclick.com/comics/ga/2025/ga251010.gif
+image_url = f"http://picayune.uclick.com/comics/ga/{jaar}/ga{datum_code}.gif"
+comic_page_url = f"https://www.gocomics.com/garfield/{jaar}/{nu.strftime('%m')}/{nu.strftime('%d')}"
 
-if not match:
-    print("FOUT: Kon het URL-patroon niet vinden in de broncode van de pagina.")
-    exit(1)
+print(f"SUCCES: De URL voor vandaag is gegenereerd: {image_url}")
 
-# match.group(1) bevat de volledige, schone URL die we hebben gevonden.
-image_url = match.group(1)
-print(f"SUCCES: Afbeelding URL gevonden via Regular Expression: {image_url}")
-# --- EINDE CORRECTIE ---
-    
-# Stap 3: Bouw de RSS-feed
+# --- Stap 2: Bouw de RSS-feed ---
+
 fg = FeedGenerator()
-fg.id(GARFIELD_URL)
-fg.title('Garfield  Comic Strip')
-fg.link(href=GARFIELD_URL, rel='alternate')
+fg.id(comic_page_url)
+fg.title('Garfield Strip')
+fg.link(href='https://www.gocomics.com/garfield', rel='alternate')
 fg.description('De dagelijkse Garfield strip.')
 fg.language('en')
 
-current_date = datetime.now(timezone.utc)
-current_date_str = current_date.strftime("%Y-%m-%d")
+# Formatteer de datum voor de titel van de feed-entry (YYYY-MM-DD)
+datum_titel = nu.strftime("%Y-%m-%d")
 
 fe = fg.add_entry()
 fe.id(image_url)
-fe.title(f'Garfield - {current_date_str}')
-fe.link(href=GARFIELD_URL)
-fe.pubDate(current_date)
-fe.description(f'<img src="{image_url}" alt="Garfield Strip voor {current_date_str}" />')
+fe.title(f'Garfield - {datum_titel}')
+fe.link(href=comic_page_url)
+fe.pubDate(nu)
+fe.description(f'<img src="{image_url}" alt="Garfield Strip voor {datum_titel}" />')
 
-# Stap 4: Schrijf het XML-bestand weg
+# --- Stap 3: Schrijf het XML-bestand weg ---
+
 try:
+    # We noemen het bestand nu 'garfield.xml'
     fg.rss_file('garfield.xml', pretty=True)
     print("SUCCES: 'garfield.xml' is aangemaakt met de strip van vandaag.")
 except Exception as e:
