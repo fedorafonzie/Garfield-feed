@@ -8,14 +8,24 @@ print("Script gestart: Genereren van de Garfield RSS-feed op basis van datum.")
 # Haal de huidige datum op
 nu = datetime.now(timezone.utc)
 
+# Bepaal de extensie op basis van de dag van de week
+# Zondag (weekday() == 6) gebruikt .jpg, de andere dagen .gif
+if nu.weekday() == 6:
+    extensie = 'jpg'
+    print("INFO: Het is zondag, de extensie wordt .jpg")
+else:
+    extensie = 'gif'
+    print(f"INFO: Het is geen zondag (dag {nu.weekday() + 1}), de extensie wordt .gif")
+
+
 # Formatteer de datum naar de structuur die de URL vereist (YYMMDD)
-# Voorbeeld: 10 oktober 2025 wordt '251010'
+# Voorbeeld: 12 oktober 2025 wordt '251012'
 datum_code = nu.strftime('%y%m%d')
 jaar = nu.strftime('%Y')
 
-# Bouw de volledige URL op
-# Voorbeeld: http://picayune.uclick.com/comics/ga/2025/ga251010.gif
-image_url = f"http://picayune.uclick.com/comics/ga/{jaar}/ga{datum_code}.gif"
+# Bouw de volledige URL op met de juiste extensie
+# Voorbeeld: http://picayune.uclick.com/comics/ga/2025/ga251012.jpg
+image_url = f"http://picayune.uclick.com/comics/ga/{jaar}/ga{datum_code}.{extensie}"
 comic_page_url = f"https://www.gocomics.com/garfield/{jaar}/{nu.strftime('%m')}/{nu.strftime('%d')}"
 
 print(f"SUCCES: De URL voor vandaag is gegenereerd: {image_url}")
