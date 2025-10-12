@@ -1,50 +1,74 @@
 from feedgen.feed import FeedGenerator
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
-print("Script gestart: Genereren van de Garfield RSS-feed op basis van datum.")
+print("Script gestart: Ophalen van klassieke C&H strip via GoComics asset server.")
 
-# --- Stap 1: Genereer de URL voor de strip van vandaag ---
+# --- Stap 1: Bepaal welke klassieke strip we vandaag tonen ---
 
-# Haal de huidige datum op
-nu = datetime.now(timezone.utc)
+# De strip liep van 18 november 1985 tot 31 december 1995.
+start_datum_strip = datetime(1985, 11, 18)
+eind_datum_strip = datetime(1995, 12, 31)
+totaal_dagen_strip = (eind_datum_strip - start_datum_strip).days + 1
 
-# Formatteer de datum naar de structuur die de URL vereist (YYMMDD)
-# Voorbeeld: 10 oktober 2025 wordt '251010'
-datum_code = nu.strftime('%y%m%d')
-jaar = nu.strftime('%Y')
+# We gebruiken een vast startpunt om de cyclus voorspelbaar te maken.
+start_punt_cyclus = datetime(2020, 1, 1)
+vandaag = datetime.now()
+dagen_verstreken = (vandaag - start_punt_cyclus).days
 
-# Bouw de volledige URL op
-# Voorbeeld: http://picayune.uclick.com/comics/ga/2025/ga251010.gif
-image_url = f"http://picayune.uclick.com/comics/ga/{jaar}/ga{datum_code}.gif"
-comic_page_url = f"https://www.gocomics.com/garfield/{jaar}/{nu.strftime('%m')}/{nu.strftime('%d')}"
+# Bereken welke dag in de strip-cyclus het vandaag is.
+cyclus_dag_index = dagen_verstreken % totaal_dagen_strip
+huidige_strip_datum = start_datum_strip + timedelta(days=cyclus_dag_index)
 
-print(f"SUCCES: De URL voor vandaag is gegenereerd: {image_url}")
+# Formatteer de datum voor de URL
+jaar = huidige_strip_datum.strftime('%Y')
+maand = huidige_strip_datum.strftime('%m')
+dag = huidige_strip_datum.strftime('%d')
+datum_code = huidige_strip_datum.strftime('%y%m%d') # Geeft YYMMDD
+
+# --- NIEUWE LOGICA: Bepaal de juiste bestandsextensie ---
+# weekday() geeft 6 terug voor Zondag.
+if huidige_strip_datum.weekday() == 6:
+    extensie = 'jpg'
+    print("Info: De stripdatum is een zondag, dus .jpg wordt gebruikt.")
+else:
+    extensie = 'gif'
+    print("Info: De stripdatum is geen zondag, dus .gif wordt gebruikt.")
+
+# Bouw de correcte, werkende URL op naar de GoComics asset server
+# Voorbeeld: https://assets.gocomics.com/comics/ch/1985/11/ch851118.gif
+image_url = f"https://assets.gocomics.com/comics/ch/{jaar}/{maand}/ch{datum_code}.{extensie}"
+
+print(f"SUCCES: De URL voor de strip van {huidige_strip_datum.strftime('%Y-%m-%d')} is: {image_url}")
+
 
 # --- Stap 2: Bouw de RSS-feed ---
 
+# We linken naar de GoComics pagina voor die specifieke datum
+comic_page_url = f"https://www.gocomics.com/calvinandhobbes/{jaar}/{maand}/{dag}"
+
 fg = FeedGenerator()
 fg.id(comic_page_url)
-fg.title('Garfield Strip')
-fg.link(href='https://www.gocomics.com/garfield', rel='alternate')
-fg.description('De dagelijkse Garfield strip.')
+fg.title('Calvin and Hobbes Strip')
+fg.link(href='https://www.gocomics.com/calvinandhobbes', rel='alternate')
+fg.description('Een dagelijkse klassieke Calvin and Hobbes strip.')
 fg.language('en')
 
-# Formatteer de datum voor de titel van de feed-entry (YYYY-MM-DD)
-datum_titel = nu.strftime("%Y-%m-%d")
+datum_titel = huidige_strip_datum.strftime("%Y-%m-%d")
 
 fe = fg.add_entry()
 fe.id(image_url)
-fe.title(f'Garfield - {datum_titel}')
+fe.title(f'Calvin and Hobbes - {datum_titel}')
 fe.link(href=comic_page_url)
-fe.pubDate(nu)
-fe.description(f'<img src="{image_url}" alt="Garfield Strip voor {datum_titel}" />')
+# De publicatiedatum in de feed is vandaag, ook al is de strip oud.
+fe.pubDate(vandaag.replace(hour=8, minute=0, second=0, microsecond=0).astimezone(timezone.utc))
+fe.description(f'<img src="{image_url}" alt="Calvin and Hobbes Strip voor {datum_titel}" />')
+
 
 # --- Stap 3: Schrijf het XML-bestand weg ---
 
 try:
-    # We noemen het bestand nu 'garfield.xml'
-    fg.rss_file('garfield.xml', pretty=True)
-    print("SUCCES: 'garfield.xml' is aangemaakt met de strip van vandaag.")
+    fg.rss_file('calvinandhobbes.xml', pretty=True)
+    print("SUCCES: 'calvinandhobbes.xml' is aangemaakt met de strip van vandaag.")
 except Exception as e:
     print(f"FOUT: Kon het bestand niet wegschrijven. Foutmelding: {e}")
     exit(1)
