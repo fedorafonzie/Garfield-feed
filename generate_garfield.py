@@ -1,59 +1,58 @@
-import requests
-from bs4 import BeautifulSoup
 from feedgen.feed import FeedGenerator
 from datetime import datetime, timezone
 
-print("Script gestart: Ophalen van de Garfield strip via ArcaMax.")
+print("Script gestart: Genereren van de Garfield RSS-feed op basis van datum.")
 
-# De URL van de ArcaMax pagina voor Garfield
-COMIC_PAGE_URL = "https://www.arcamax.com/thefunnies/garfield/"
-image_url = None
+# --- Stap 1: Genereer de URL voor de strip van vandaag ---
 
-try:
-    # --- Stap 1: Haal de pagina op en extraheer de image URL ---
-    print(f"Pagina ophalen: {COMIC_PAGE_URL}")
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'}
-    response = requests.get(COMIC_PAGE_URL, headers=headers)
-    response.raise_for_status()
+# Haal de huidige datum op
+nu = datetime.now(timezone.utc)
 
-    # Gebruik BeautifulSoup om de HTML te parsen
-    soup = BeautifulSoup(response.content, 'html.parser')
-    
-    # Zoek naar de <img> tag met id="comic-zoom"
-    img_tag = soup.find('img', id='comic-zoom')
-    
-    if img_tag and img_tag.has_attr('src'):
-        image_url = img_tag['src']
-        print(f"SUCCES: Afbeelding URL gevonden: {image_url}")
-    else:
-        raise ValueError("Kon de <img> tag met id='comic-zoom' niet vinden.")
+# Bepaal de extensie op basis van de dag van de week
+# Zondag (weekday() == 6) gebruikt .jpg, de andere dagen .gif
+if nu.weekday() == 6:
+    extensie = 'jpg'
+    print("INFO: Het is zondag, de extensie wordt .jpg")
+else:
+    extensie = 'gif'
+    print(f"INFO: Het is geen zondag (dag {nu.weekday() + 1}), de extensie wordt .gif")
 
-except (requests.exceptions.RequestException, ValueError) as e:
-    print(f"FOUT: Kon de afbeelding niet ophalen. Foutdetails: {e}")
-    exit(1)
+
+# Formatteer de datum naar de structuur die de URL vereist (YYMMDD)
+# Voorbeeld: 12 oktober 2025 wordt '251012'
+datum_code = nu.strftime('%y%m%d')
+jaar = nu.strftime('%Y')
+
+# Bouw de volledige URL op met de juiste extensie
+# Voorbeeld: http://picayune.uclick.com/comics/ga/2025/ga251012.jpg
+image_url = f"http://picayune.uclick.com/comics/ga/{jaar}/ga{datum_code}.{extensie}"
+comic_page_url = f"https://www.gocomics.com/garfield/{jaar}/{nu.strftime('%m')}/{nu.strftime('%d')}"
+
+print(f"SUCCES: De URL voor vandaag is gegenereerd: {image_url}")
 
 # --- Stap 2: Bouw de RSS-feed ---
 
 fg = FeedGenerator()
-fg.id(COMIC_PAGE_URL)
-fg.title('Garfield Comic Strip')
-fg.link(href=COMIC_PAGE_URL, rel='alternate')
+fg.id(comic_page_url)
+fg.title('Garfield Strip')
+fg.link(href='https://www.gocomics.com/garfield', rel='alternate')
 fg.description('De dagelijkse Garfield strip.')
 fg.language('en')
 
-nu = datetime.now(timezone.utc)
+# Formatteer de datum voor de titel van de feed-entry (YYYY-MM-DD)
 datum_titel = nu.strftime("%Y-%m-%d")
 
 fe = fg.add_entry()
 fe.id(image_url)
 fe.title(f'Garfield - {datum_titel}')
-fe.link(href=COMIC_PAGE_URL)
+fe.link(href=comic_page_url)
 fe.pubDate(nu)
 fe.description(f'<img src="{image_url}" alt="Garfield Strip voor {datum_titel}" />')
 
 # --- Stap 3: Schrijf het XML-bestand weg ---
 
 try:
+    # We noemen het bestand nu 'garfield.xml'
     fg.rss_file('garfield.xml', pretty=True)
     print("SUCCES: 'garfield.xml' is aangemaakt met de strip van vandaag.")
 except Exception as e:
