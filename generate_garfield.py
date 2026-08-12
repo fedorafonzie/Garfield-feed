@@ -1,77 +1,60 @@
 import requests
-from bs4 import BeautifulSoup
+import re
+import sys
 from feedgen.feed import FeedGenerator
 from datetime import datetime, timezone
 
-print("Script gestart: Genereren van de Garfield RSS-feed.")
-
-# --- Stap 1: Bepaal de URL van de webpagina van vandaag ---
-
-nu = datetime.now(timezone.utc)
-jaar = nu.strftime('%Y')
-maand = nu.strftime('%m')
-dag = nu.strftime('%d')
-
-comic_page_url = f"https://www.gocomics.com/garfield/{jaar}/{maand}/{dag}"
-print(f"INFO: Zoeken naar strip op {comic_page_url}")
-
-# --- Stap 2: Scrape de webpagina om de afbeeldings-URL te vinden ---
-
-# We gebruiken een User-Agent omdat sommige websites scripts blokkeren
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+# We doen ons voor als Googlebot om de Bunny Shield wachtpagina te omzeilen
+URL = 'https://www.gocomics.com/garfield'
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
 }
 
+print(f"--- START SCRAPE (Googlebot emulatie) ---")
+
 try:
-    response = requests.get(comic_page_url, headers=headers)
-    response.raise_for_status() # Controleer of de pagina succesvol is geladen
+    response = requests.get(URL, headers=HEADERS, timeout=15)
+    html = response.text
+    print(f"Status: {response.status_code}")
+    print(f"Paginatitel: {re.search(r'<title>(.*?)</title>', html).group(1) if re.search(r'<title>(.*?)</title>', html) else 'Geen titel'}")
     
-    # Parse de HTML
-    soup = BeautifulSoup(response.text, 'html.parser')
-    
-    # GoComics plaatst de strip in een 'picture' tag met de class 'item-comic-image'
-    comic_element = soup.select_one('.item-comic-image img')
-    
-    if comic_element and comic_element.has_attr('src'):
-        image_url = comic_element['src']
-        print(f"SUCCES: Afbeeldings-URL gevonden: {image_url}")
-    else:
-        print("FOUT: Kon de afbeelding niet vinden op de pagina. De HTML-structuur is mogelijk gewijzigd.")
-        exit(1)
+    if "Establishing a secure connection" in html:
+        print("FOUT: Nog steeds geblokkeerd door Bunny Shield. Googlebot methode werkt hier niet.")
+        sys.exit(1)
         
-except requests.exceptions.RequestException as e:
-    print(f"FOUT: Kon de GoComics pagina niet laden. Melding: {e}")
-    exit(1)
+except Exception as e:
+    print(f"FOUT: Verbinding mislukt. {e}")
+    sys.exit(1)
 
-# --- Stap 3: Bouw de RSS-feed ---
+# Zoek de ID. We kijken naar de ID die in de 'comic' data of 'assets' URL staat.
+# We zoeken specifiek naar de 32-tekens ID die bij de strip hoort.
+# We negeren de Sentry-trace door te controleren of 'assets' in de buurt staat.
+match = re.search(r'assets[\\\/]+([a-f0-9]{32})', html)
 
+if match:
+    asset_id = match.group(1)
+    image_url = f"https://featureassets.gocomics.com/assets/{asset_id}?optimizer=image&width=1400&quality=85"
+    print(f"GEVONDEN ID: {asset_id}")
+    print(f"URL: {image_url}")
+else:
+    print("FOUT: Geen strip-ID gevonden in de broncode.")
+    # Toon de eerste 500 tekens om te zien waar we zijn beland
+    print("Broncode preview:", html[:500])
+    sys.exit(1)
+
+# RSS opbouw
 fg = FeedGenerator()
-fg.id('https://www.gocomics.com/garfield')
-fg.title('Garfield Strip')
-fg.link(href='https://www.gocomics.com/garfield', rel='alternate')
-fg.description('De dagelijkse Garfield strip.')
-fg.language('en')
-
-datum_titel = nu.strftime("%Y-%m-%d")
+fg.id(URL)
+fg.title('Garfield')
+fg.link(href=URL, rel='alternate')
+fg.description('Dagelijkse strip')
 
 fe = fg.add_entry()
-fe.id(image_url) # Gebruik de dynamisch gevonden afbeeldings-URL
-fe.title(f'Garfield - {datum_titel}')
-fe.link(href=comic_page_url)
-fe.pubDate(nu)
+fe.id(image_url)
+fe.title(f'Garfield - {datetime.now().strftime("%Y-%m-%d")}')
+fe.link(href=URL)
+fe.description(f'<img src="{image_url}" />')
 
-# Omdat de url geen standaard extensie meer heeft, gebruiken we image/jpeg als veilige aanname
-fe.enclosure(image_url, 0, 'image/jpeg')
-
-# De afbeelding tonen in de feed
-fe.content(f'<img src="{image_url}" alt="Garfield Strip voor {datum_titel}" />', type='html')
-fe.description(f'Garfield Strip voor {datum_titel}') 
-
-# --- Stap 4: Schrijf het XML-bestand weg ---
-
-try:
-    fg.rss_file('garfield.xml', pretty=True)
-    print("SUCCES: 'garfield.xml' is aangemaakt met de strip van vandaag.")
-except Exception as e:
-    print(f"FOUT: Kon het bestand niet wegschrijven. Foutmelding: {e}")
-    exit(1)
+fg.rss_file('garfield.xml', pretty=True)
+print("KLAAR: XML bestand is aangemaakt.")
