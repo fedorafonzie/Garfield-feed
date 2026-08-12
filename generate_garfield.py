@@ -1,34 +1,52 @@
+import requests
+from bs4 import BeautifulSoup
 from feedgen.feed import FeedGenerator
 from datetime import datetime, timezone
 
-print("Script gestart: Genereren van de Garfield RSS-feed op basis van datum.")
+print("Script gestart: Genereren van de Garfield RSS-feed.")
 
-# --- Stap 1: Genereer de URL voor de strip van vandaag ---
+# --- Stap 1: Bepaal de URL van de webpagina van vandaag ---
 
 nu = datetime.now(timezone.utc)
-
-if nu.weekday() == 6:
-    extensie = 'jpg'
-    mime_type = 'image/jpeg'
-    print("INFO: Het is zondag, de extensie wordt .jpg")
-else:
-    extensie = 'gif'
-    mime_type = 'image/gif'
-    print(f"INFO: Het is geen zondag (dag {nu.weekday() + 1}), de extensie wordt .gif")
-
-datum_code = nu.strftime('%y%m%d')
 jaar = nu.strftime('%Y')
+maand = nu.strftime('%m')
+dag = nu.strftime('%d')
 
-# OPLOSSING 1: Wijzig http naar https in de URL
-image_url = f"https://picayune.uclick.com/comics/ga/{jaar}/ga{datum_code}.{extensie}"
-comic_page_url = f"https://www.gocomics.com/garfield/{jaar}/{nu.strftime('%m')}/{nu.strftime('%d')}"
+comic_page_url = f"https://www.gocomics.com/garfield/{jaar}/{maand}/{dag}"
+print(f"INFO: Zoeken naar strip op {comic_page_url}")
 
-print(f"SUCCES: De URL voor vandaag is gegenereerd: {image_url}")
+# --- Stap 2: Scrape de webpagina om de afbeeldings-URL te vinden ---
 
-# --- Stap 2: Bouw de RSS-feed ---
+# We gebruiken een User-Agent omdat sommige websites scripts blokkeren
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+}
+
+try:
+    response = requests.get(comic_page_url, headers=headers)
+    response.raise_for_status() # Controleer of de pagina succesvol is geladen
+    
+    # Parse de HTML
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    # GoComics plaatst de strip in een 'picture' tag met de class 'item-comic-image'
+    comic_element = soup.select_one('.item-comic-image img')
+    
+    if comic_element and comic_element.has_attr('src'):
+        image_url = comic_element['src']
+        print(f"SUCCES: Afbeeldings-URL gevonden: {image_url}")
+    else:
+        print("FOUT: Kon de afbeelding niet vinden op de pagina. De HTML-structuur is mogelijk gewijzigd.")
+        exit(1)
+        
+except requests.exceptions.RequestException as e:
+    print(f"FOUT: Kon de GoComics pagina niet laden. Melding: {e}")
+    exit(1)
+
+# --- Stap 3: Bouw de RSS-feed ---
 
 fg = FeedGenerator()
-fg.id(comic_page_url)
+fg.id('https://www.gocomics.com/garfield')
 fg.title('Garfield Strip')
 fg.link(href='https://www.gocomics.com/garfield', rel='alternate')
 fg.description('De dagelijkse Garfield strip.')
@@ -37,19 +55,19 @@ fg.language('en')
 datum_titel = nu.strftime("%Y-%m-%d")
 
 fe = fg.add_entry()
-fe.id(image_url)
+fe.id(image_url) # Gebruik de dynamisch gevonden afbeeldings-URL
 fe.title(f'Garfield - {datum_titel}')
 fe.link(href=comic_page_url)
 fe.pubDate(nu)
 
-# OPLOSSING 2: Gebruik een enclosure voor de afbeelding (standaard RSS specificatie)
-fe.enclosure(image_url, 0, mime_type)
+# Omdat de url geen standaard extensie meer heeft, gebruiken we image/jpeg als veilige aanname
+fe.enclosure(image_url, 0, 'image/jpeg')
 
-# OPLOSSING 3: Gebruik fe.content met type='html' voor de img-tag in plaats van description
+# De afbeelding tonen in de feed
 fe.content(f'<img src="{image_url}" alt="Garfield Strip voor {datum_titel}" />', type='html')
-fe.description(f'Garfield Strip voor {datum_titel}') # Platte tekst als fallback
+fe.description(f'Garfield Strip voor {datum_titel}') 
 
-# --- Stap 3: Schrijf het XML-bestand weg ---
+# --- Stap 4: Schrijf het XML-bestand weg ---
 
 try:
     fg.rss_file('garfield.xml', pretty=True)
